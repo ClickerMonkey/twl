@@ -38,12 +38,10 @@ import de.matthiasmann.twl.renderer.Texture;
 import de.matthiasmann.twl.utils.PNGDecoder;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
-import org.lwjgl.opengl.EXTAbgr;
+import org.lwjgl.opengl.GL;
+import org.lwjgl.opengl.EXTABGR;
 import org.lwjgl.opengl.GL11;
 import org.lwjgl.opengl.GL12;
-import org.lwjgl.opengl.GLContext;
-import org.lwjgl.opengl.OpenGLException;
-import org.lwjgl.opengl.Util;
 
 /**
  * Simple texture implementation for TWL using LWJGL.
@@ -60,7 +58,7 @@ public class LWJGLTexture implements Texture, Resource, QueriablePixels {
         RGB_SMALL(GL11.GL_RGB, GL11.GL_RGB5_A1, PNGDecoder.Format.RGB),
         RGBA(GL11.GL_RGBA, GL11.GL_RGBA8, PNGDecoder.Format.RGBA),
         BGRA(GL12.GL_BGRA, GL11.GL_RGBA8, PNGDecoder.Format.BGRA),
-        ABGR(EXTAbgr.GL_ABGR_EXT, GL11.GL_RGBA8, PNGDecoder.Format.ABGR),
+        ABGR(EXTABGR.GL_ABGR_EXT, GL11.GL_RGBA8, PNGDecoder.Format.ABGR),
         COLOR(-1, -1, null);
 
         final int glFormat;
@@ -112,14 +110,14 @@ public class LWJGLTexture implements Texture, Resource, QueriablePixels {
 
         id = GL11.glGenTextures();
         if(id == 0) {
-            throw new OpenGLException("failed to allocate texture ID");
+            throw new RuntimeException("failed to allocate texture ID");
         }
 
         GL11.glBindTexture(GL11.GL_TEXTURE_2D, id);
         GL11.glPixelStorei(GL11.GL_UNPACK_ROW_LENGTH, 0);
         GL11.glPixelStorei(GL11.GL_UNPACK_ALIGNMENT, 1);
 
-        if(GLContext.getCapabilities().OpenGL12) {
+        if(GL.getCapabilities().OpenGL12) {
             GL11.glTexParameteri(GL11.GL_TEXTURE_2D, GL11.GL_TEXTURE_WRAP_S, GL12.GL_CLAMP_TO_EDGE);
             GL11.glTexParameteri(GL11.GL_TEXTURE_2D, GL11.GL_TEXTURE_WRAP_T, GL12.GL_CLAMP_TO_EDGE);
         } else {
@@ -139,7 +137,7 @@ public class LWJGLTexture implements Texture, Resource, QueriablePixels {
                     0, fmt.glFormat, GL11.GL_UNSIGNED_BYTE,
                     (ByteBuffer)null);
             if(buf != null) {
-                Util.checkGLError();
+                // Util.checkGLError(); TODO
                 GL11.glTexSubImage2D(GL11.GL_TEXTURE_2D, 0,
                         0, 0, width, height, fmt.glFormat,
                         GL11.GL_UNSIGNED_BYTE, buf);
@@ -150,7 +148,7 @@ public class LWJGLTexture implements Texture, Resource, QueriablePixels {
                     0, fmt.glFormat, GL11.GL_UNSIGNED_BYTE, buf);
         }
 
-        Util.checkGLError();
+        // Util.checkGLError(); TODO
 
         this.width = width;
         this.height = height;

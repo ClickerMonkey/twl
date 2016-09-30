@@ -55,18 +55,18 @@ import java.net.URL;
 import java.nio.ByteBuffer;
 import java.nio.IntBuffer;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.Locale;
+import java.util.Map;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import org.lwjgl.BufferUtils;
-import org.lwjgl.LWJGLException;
-import org.lwjgl.Sys;
-import org.lwjgl.input.Cursor;
-import org.lwjgl.input.Mouse;
-import org.lwjgl.opengl.ContextCapabilities;
-import org.lwjgl.opengl.EXTTextureRectangle;
+import org.lwjgl.glfw.GLFW;
+import org.lwjgl.glfw.GLFWCursorEnterCallbackI;
+import org.lwjgl.opengl.GL;
 import org.lwjgl.opengl.GL11;
-import org.lwjgl.opengl.GLContext;
+import org.lwjgl.opengl.GLCapabilities;
 
 /**
  * A renderer using only GL11 features.
@@ -96,7 +96,7 @@ public class LWJGLRenderer implements Renderer, LineRenderer {
     private int height;
     private boolean hasScissor;
     private final TintStack tintStateRoot;
-    private final Cursor emptyCursor;
+    // private final Cursor emptyCursor;
     private boolean useQuadsForLines;
     private boolean useSWMouseCursors;
     private SWCursor swCursor;
@@ -114,8 +114,7 @@ public class LWJGLRenderer implements Renderer, LineRenderer {
     protected final ClipStack clipStack;
     protected final Rect clipRectTemp;
     
-    @SuppressWarnings("OverridableMethodCallInConstructor")
-    public LWJGLRenderer() throws LWJGLException {
+    public LWJGLRenderer() {
         this.ib16 = BufferUtils.createIntBuffer(16);
         this.textureAreas = new ArrayList<TextureArea>();
         this.rotatedTextureAreas = new ArrayList<TextureAreaRotated>();
@@ -126,9 +125,10 @@ public class LWJGLRenderer implements Renderer, LineRenderer {
         this.clipRectTemp = new Rect();
         syncViewportSize();
 
-        GL11.glGetInteger(GL11.GL_MAX_TEXTURE_SIZE, ib16);
+        GL11.glGetIntegerv(GL11.GL_MAX_TEXTURE_SIZE, ib16);
         maxTextureSize = ib16.get(0);
 
+        /*
         if(Mouse.isCreated()) {
             int minCursorSize = Cursor.getMinCursorSize();
             IntBuffer tmp = BufferUtils.createIntBuffer(minCursorSize * minCursorSize);
@@ -137,6 +137,7 @@ public class LWJGLRenderer implements Renderer, LineRenderer {
         } else {
             emptyCursor = null;
         }
+        */
 
         swCursorAnimState = new SWCursorAnimState();
     }
@@ -223,7 +224,7 @@ public class LWJGLRenderer implements Renderer, LineRenderer {
      */
     public void syncViewportSize() {
         ib16.clear();
-        GL11.glGetInteger(GL11.GL_VIEWPORT, ib16);
+        GL11.glGetIntegerv(GL11.GL_VIEWPORT, ib16);
         viewportX = ib16.get(0);
         width = ib16.get(2);
         height = ib16.get(3);
@@ -248,12 +249,15 @@ public class LWJGLRenderer implements Renderer, LineRenderer {
     }
 
     public long getTimeMillis() {
+        return System.nanoTime() / 1000000;
+        /* TODO what?
         long res = Sys.getTimerResolution();
         long time = Sys.getTime();
         if(res != 1000) {
             time = (time * 1000) / res;
         }
         return time;
+        */
     }
     
     /**
@@ -428,8 +432,8 @@ public class LWJGLRenderer implements Renderer, LineRenderer {
         int texWidth = width;
         int texHeight = height;
         
-        ContextCapabilities caps = GLContext.getCapabilities();
-        boolean useTextureRectangle = caps.GL_EXT_texture_rectangle || caps.GL_ARB_texture_rectangle;
+        GLCapabilities caps = GL.getCapabilities();
+        boolean useTextureRectangle = caps.GL_ARB_texture_rectangle;
 
         if(!useTextureRectangle && !caps.GL_ARB_texture_non_power_of_two) {
             texWidth = nextPowerOf2(width);
@@ -437,12 +441,12 @@ public class LWJGLRenderer implements Renderer, LineRenderer {
         }
 
         // ARB and EXT versions use the same enum !
-        int proxyTarget = useTextureRectangle ?
-            EXTTextureRectangle.GL_PROXY_TEXTURE_RECTANGLE_EXT : GL11.GL_PROXY_TEXTURE_2D;
+        int proxyTarget = /* useTextureRectangle ?
+            EXTTextureRectangle.GL_PROXY_TEXTURE_RECTANGLE_EXT : */ GL11.GL_PROXY_TEXTURE_2D;
 
         GL11.glTexImage2D(proxyTarget, 0, GL11.GL_RGBA, texWidth, texHeight, 0, GL11.GL_RGBA, GL11.GL_UNSIGNED_BYTE, (ByteBuffer)null);
         ib16.clear();
-        GL11.glGetTexLevelParameter(proxyTarget, 0, GL11.GL_TEXTURE_WIDTH, ib16);
+        GL11.glGetTexLevelParameteriv(proxyTarget, 0, GL11.GL_TEXTURE_WIDTH, ib16);
         if(ib16.get(0) != texWidth) {
             getLogger().log(Level.WARNING, "requested size {0} x {1} failed proxy texture test",
                     new Object[]{ texWidth, texHeight });
@@ -450,8 +454,7 @@ public class LWJGLRenderer implements Renderer, LineRenderer {
         }
 
         // ARB and EXT versions use the same enum !
-        int target = useTextureRectangle ?
-            EXTTextureRectangle.GL_TEXTURE_RECTANGLE_EXT : GL11.GL_TEXTURE_2D;
+        int target = GL11.GL_TEXTURE_2D;
         int id = GL11.glGenTextures();
 
         GL11.glBindTexture(target, id);
@@ -488,6 +491,7 @@ public class LWJGLRenderer implements Renderer, LineRenderer {
     }
 
     public void setCursor(MouseCursor cursor) {
+        /*
         try {
             swCursor = null;
             if(isMouseInsideWindow()) {
@@ -503,6 +507,7 @@ public class LWJGLRenderer implements Renderer, LineRenderer {
         } catch(LWJGLException ex) {
             getLogger().log(Level.WARNING, "Could not set native cursor", ex);
         }
+        */
     }
 
     public void setMousePosition(int mouseX, int mouseY) {
@@ -619,12 +624,30 @@ public class LWJGLRenderer implements Renderer, LineRenderer {
         }
     }
     
-    protected void setNativeCursor(Cursor cursor) throws LWJGLException {
+    /*
+    protected void setNativeCursor(Cursor cursor) throws  {
         Mouse.setNativeCursor(cursor);
     }
+    */
+    
+    private Map<Long, Boolean> isMouseInside = new HashMap<>();
     
     protected boolean isMouseInsideWindow() {
-        return Mouse.isInsideWindow();
+        long context = GLFW.glfwGetCurrentContext();
+        Boolean inside = isMouseInside.get(context);
+        
+        if (inside == null) {
+            final AtomicReference<GLFWCursorEnterCallbackI> previous = new AtomicReference<>(null);
+            GLFWCursorEnterCallbackI callback = (window, entered) -> {
+                if (previous.get() != null) {
+                    previous.get().invoke(window, entered);
+                }
+                isMouseInside.put(context, entered);
+            };
+            previous.set(GLFW.glfwSetCursorEnterCallback(context, callback));
+        }
+        
+        return inside != null && inside;
     }
 
     protected void getTintedColor(Color color, float[] result) {
@@ -703,13 +726,13 @@ public class LWJGLRenderer implements Renderer, LineRenderer {
 
         void setAnimationState(int idx, boolean isActive) {
             if(idx >= 0 && idx < 3 && active[idx] != isActive) {
-                lastTime[idx] = Sys.getTime();
+                lastTime[idx] = System.nanoTime() / 1000000;
                 active[idx] = isActive;
             }
         }
 
         public int getAnimationTime(StateKey state) {
-            long curTime = Sys.getTime();
+            long curTime = System.nanoTime() / 1000000;
             int idx = getMouseButton(state);
             if(idx >= 0) {
                 curTime -= lastTime[idx];

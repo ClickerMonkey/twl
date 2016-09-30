@@ -55,9 +55,9 @@ public class VertexArray {
     
     public void bind() {
         va.position(2);
-        GL11.glVertexPointer(2, 4*4, va);
+        GL11.glVertexPointer(2, GL11.GL_FLOAT, 4*4, va);
         va.position(0);
-        GL11.glTexCoordPointer(2, 4*4, va);
+        GL11.glTexCoordPointer(2, GL11.GL_FLOAT, 4*4, va);
         GL11.glEnableClientState(GL11.GL_VERTEX_ARRAY);
         GL11.glEnableClientState(GL11.GL_TEXTURE_COORD_ARRAY);
     }
